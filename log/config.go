@@ -3,11 +3,16 @@ package log
 const (
 	OutputConsole = "console"
 	OutputFile    = "file"
+
+	FormatterConsole = "console"
+	FormatterJson    = "json"
+
+	DefaultLogFileName = "ap.log"
 )
 
 var defaultConfig = []OutputConfig{{
 	Writer:    OutputConsole,
-	Formatter: "console",
+	Formatter: FormatterConsole,
 	Level:     "info",
 }}
 
@@ -44,8 +49,14 @@ type WriteConfig struct {
 	MaxBackups uint `yaml:"max_backups"`
 	// MaxSize is the max size of log file(MB).
 	MaxSize int64 `yaml:"max_size"`
-	// RotationTime is the rotation time
+	// RotationTime is the rotation time interval (minute).
 	RotationTime int `yaml:"rotation_time"`
+	// TimeFormat is the time format for log file name.
+	// Default is ".%Y%m%d%H%M" (精确到分钟).
+	// Examples:
+	//   - ".%Y%m%d" -> app.log.20260211
+	//   - ".%Y%m%d%H" -> app.log.2026021122
+	TimeFormat string `yaml:"time_format"`
 }
 
 type FormatConfig struct {

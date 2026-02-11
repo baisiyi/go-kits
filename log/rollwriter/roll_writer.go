@@ -82,7 +82,7 @@ func NewRollWriter(filePath string, opt ...OptionFunc) (WriteSyncer, error) {
 		maxAge:        7 * 24 * time.Hour, // 默认保留 7 天
 		rotationAge:   24 * time.Hour,     // 默认每天轮转
 		rotationSize:  100 * 1024 * 1024,  // 默认 100MB 轮转
-		rotationCount: 0,                   // 默认不限制数量
+		rotationCount: 0,                  // 默认不限制数量
 	}
 	for _, o := range opt {
 		o(opts)
@@ -90,6 +90,7 @@ func NewRollWriter(filePath string, opt ...OptionFunc) (WriteSyncer, error) {
 
 	// 构建 rotatelogs 选项
 	options := []rotatelogs.Option{
+		rotatelogs.WithLinkName(filePath),
 		rotatelogs.WithRotationTime(opts.rotationAge),
 		rotatelogs.WithRotationSize(opts.rotationSize),
 	}

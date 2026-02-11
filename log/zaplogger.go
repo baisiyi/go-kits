@@ -86,8 +86,8 @@ func newEncoder(c *OutputConfig) zapcore.Encoder {
 }
 
 var formatEncoders = map[string]NewFormatEncoder{
-	"console": zapcore.NewConsoleEncoder,
-	"json":    zapcore.NewJSONEncoder,
+	FormatterConsole: zapcore.NewConsoleEncoder,
+	FormatterJson:    zapcore.NewJSONEncoder,
 }
 
 // NewFormatEncoder is the function type for creating a format encoder out of an encoder config.
@@ -112,9 +112,18 @@ func newFileCore(c *OutputConfig) (zapcore.Core, zap.AtomicLevel, error) {
 
 	opts := []rollwriter.OptionFunc{
 		rollwriter.WithMaxAge(c.WriteConfig.MaxAge),
-		rollwriter.WithRotationAge(c.WriteConfig.RotationTime),
-		rollwriter.WithRotationSize(c.WriteConfig.MaxSize),
+		rollwriter.WithRotationAgeDuration(time.Duration(c.WriteConfig.RotationTime) * time.Minute),
+		rollwriter.WithRotationSize(c.WriteConfig.MaxSize * 1024 * 1024), // MB 转字节
 		rollwriter.WithRotationCount(c.WriteConfig.MaxBackups),
+	}
+
+	// 使用配置的 TimeFormat，未配置时使用默认值（由 rollwriter 内部处理）
+	if c.WriteConfig.TimeFormat != "" {
+		opts = append(opts, rollwriter.WithTimeFormat(c.WriteConfig.TimeFormat))
+	}
+
+	if c.WriteConfig.Filename == "" {
+		c.WriteConfig.Filename = DefaultLogFileName
 	}
 
 	writer, err := rollwriter.NewRollWriter(c.WriteConfig.Filename, opts...)
