@@ -224,6 +224,85 @@ log.Register("my_logger", &MyLogger{})
 logger := log.Get("my_logger")
 ```
 
+## 框架集成 (Factory)
+
+`log.Factory` 实现了 `plugin.Factory` 接口，可供外部框架统一管理插件生命周期。
+
+### Decoder 配置解码器
+
+`Decoder` 是配置解码工具，用于解耦插件配置与调用方：
+
+```go
+type Decoder struct {
+    OutputConfig *OutputConfig  // 输出配置
+    Core         zapcore.Core   // Zap Core
+    ZapLevel     zap.AtomicLevel // 日志级别
+}
+```
+
+**使用模式：** 框架传入 `*Decoder`，Factory 通过 `Decoder.Decode()` 获取配置：
+
+```go
+// ConsoleWriterFactory 的内部实现
+cfg := &OutputConfig{}
+decoder := &Decoder{OutputConfig: cfg}
+err := decoder.Decode(&cfg)  // cfg 指向 OutputConfig
+```
+
+### Factory 接口
+
+```go
+type Factory struct{}
+
+func (f *Factory) Type() string       // 返回 "log"
+func (f *Factory) Setup(name string, dec plugin.Decoder) error
+```
+
+### 框架集成示例
+
+```go
+package main
+
+import (
+    "github.com/baisiyi/go-kits/log"
+    "github.com/baisiyi/go-kits/plugin"
+)
+
+func main() {
+    // 1. 从配置文件读取配置
+    yamlConfig := `
+writer: console
+formatter: console
+level: debug
+`
+    var cfg log.Config
+    yaml.Unmarshal([]byte(yamlConfig), &cfg)
+
+    // 2. 创建 Decoder（框架侧实现）
+    decoder := &log.Decoder{OutputConfig: &cfg[0]}
+
+    // 3. 通过 plugin 框架获取 log 工厂
+    logFactory := plugin.Get("log", "default")
+
+    // 4. 调用 Setup 初始化日志
+    logFactory.Setup("default", decoder)
+
+    // 5. 之后可使用 log.Infof() 等便捷函数
+    log.Info("framework integration complete")
+}
+```
+
+### 注册到 plugin 框架
+
+log 包在 `init()` 中已将 `DefaultLogFactory` 注册到 plugin：
+
+```go
+func init() {
+    // ... 其他初始化
+    plugin.Register(defaultLoggerName, DefaultLogFactory)
+}
+```
+
 ## API 参考
 
 ### 便捷函数
