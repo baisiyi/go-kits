@@ -113,7 +113,7 @@ func newFileCore(c *OutputConfig) (zapcore.Core, zap.AtomicLevel, error) {
 	opts := []rollwriter.OptionFunc{
 		rollwriter.WithMaxAge(c.WriteConfig.MaxAge),
 		rollwriter.WithRotationAgeDuration(time.Duration(c.WriteConfig.RotationTime) * time.Minute),
-		rollwriter.WithRotationSize(c.WriteConfig.MaxSize * 1024 * 1024), // MB 转字节
+		rollwriter.WithRotationSizeMB(c.WriteConfig.MaxSize),
 		rollwriter.WithRotationCount(c.WriteConfig.MaxBackups),
 	}
 

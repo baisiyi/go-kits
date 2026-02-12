@@ -7,6 +7,16 @@ import (
 	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
 )
 
+const (
+	_  = iota             // 忽略 0 值
+	KB = 1 << (10 * iota) // 1 << 10 = 1024
+	MB                    // 1 << 20
+	GB                    // 1 << 30
+	TB                    // 1 << 40
+	PB                    // 1 << 50
+	EB                    // 1 << 60
+)
+
 // WriteSyncer 定义了日志写入器需要实现的行为
 type WriteSyncer interface {
 	io.Writer
@@ -18,12 +28,11 @@ type OptionFunc func(*Options)
 
 // Options 存储轮转日志的配置选项
 type Options struct {
-	timeFormat    string
-	options       []rotatelogs.Option
-	maxAge        time.Duration
-	rotationAge   time.Duration
-	rotationSize  int64
-	rotationCount uint
+	timeFormat    string        // 时间格式
+	maxAge        time.Duration // 日志默认保留时间（Hour）
+	rotationAge   time.Duration // 日志轮转时间（Hour）
+	rotationSize  int64         // 日志轮转容量（Byte）
+	rotationCount uint          // 日志文件数量
 }
 
 // WithTimeFormat 设置时间格式
@@ -68,6 +77,13 @@ func WithRotationSize(size int64) OptionFunc {
 	}
 }
 
+// WithRotationSizeMB 设置单个日志文件的最大字节数(MB)
+func WithRotationSizeMB(size int64) OptionFunc {
+	return func(o *Options) {
+		o.rotationSize = size * MB
+	}
+}
+
 // WithRotationCount 设置最大保留的文件数量
 func WithRotationCount(count uint) OptionFunc {
 	return func(o *Options) {
@@ -81,7 +97,7 @@ func NewRollWriter(filePath string, opt ...OptionFunc) (WriteSyncer, error) {
 		timeFormat:    ".%Y%m%d%H%M",
 		maxAge:        7 * 24 * time.Hour, // 默认保留 7 天
 		rotationAge:   24 * time.Hour,     // 默认每天轮转
-		rotationSize:  100 * 1024 * 1024,  // 默认 100MB 轮转
+		rotationSize:  100 * MB,           // 默认 100MB 轮转
 		rotationCount: 0,                  // 默认不限制数量
 	}
 	for _, o := range opt {
