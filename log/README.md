@@ -258,7 +258,76 @@ func (f *Factory) Type() string       // 返回 "log"
 func (f *Factory) Setup(name string, dec plugin.Decoder) error
 ```
 
-### 框架集成示例
+### 注册到 plugin 框架
+
+log 包在 `init()` 中已将 `DefaultLogFactory` 注册到 plugin：
+
+```go
+func init() {
+    // ... 其他初始化
+    plugin.Register(defaultLoggerName, DefaultLogFactory)
+}
+```
+
+### 完整 YAML 配置集成示例
+
+使用 `plugin.Config` 从 YAML 文件加载日志配置：
+
+```go
+package main
+
+import (
+    "fmt"
+
+    "gopkg.in/yaml.v3"
+
+    "github.com/baisiyi/go-kits/log"
+    "github.com/baisiyi/go-kits/plugin"
+)
+
+func main() {
+    // YAML 配置（通常从文件读取）
+    yamlConfig := `
+log:
+  default:
+    - writer: console
+      formatter: console
+      level: debug
+      enable_color: true
+      caller_skip: 2
+    - writer: file
+      formatter: json
+      level: info
+      writer_config:
+        log_path: /var/log/myapp
+        filename: app.log
+        max_age: 7
+        max_backups: 10
+        max_size: 100
+        rotation_time: 24
+`
+
+    // 解析 YAML 配置
+    var config plugin.Config
+    if err := yaml.Unmarshal([]byte(yamlConfig), &config); err != nil {
+        panic(err)
+    }
+
+    // 加载所有插件（包括 log）
+    closeFunc, err := config.SetupClosables()
+    if err != nil {
+        panic(err)
+    }
+    defer closeFunc()
+
+    // 使用 log 包
+    log.Info("application started")
+    log.Infof("server listening on %s:%d", "localhost", 8080)
+    log.Debugf("debug info: %v", "some data")
+}
+```
+
+### 直接使用 plugin 框架初始化
 
 ```go
 package main
@@ -289,17 +358,6 @@ level: debug
 
     // 5. 之后可使用 log.Infof() 等便捷函数
     log.Info("framework integration complete")
-}
-```
-
-### 注册到 plugin 框架
-
-log 包在 `init()` 中已将 `DefaultLogFactory` 注册到 plugin：
-
-```go
-func init() {
-    // ... 其他初始化
-    plugin.Register(defaultLoggerName, DefaultLogFactory)
 }
 ```
 

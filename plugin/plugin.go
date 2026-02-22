@@ -14,7 +14,7 @@ type Factory interface {
 
 // Decoder is the interface used to decode plugin configuration.
 type Decoder interface {
-	Decode(v interface{}) error // the input param is the custom configuration of the plugin
+	Decode(v any) error // the input param is the custom configuration of the plugin
 }
 
 func Register(name string, f Factory) {
