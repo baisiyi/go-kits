@@ -5,16 +5,18 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/baisiyi/go-kits/log"
 )
 
 // mockLogger is a mock implementation of log.Logger for testing.
 type mockLogger struct {
-	infos []string
-	errors []string
-	warns []string
-	debugs []string
+	infos      []string
+	errors     []string
+	warns      []string
+	debugs     []string
 	lastFormat string
-	lastArgs []interface{}
+	lastArgs   []interface{}
 }
 
 func (m *mockLogger) Infof(format string, args ...interface{}) {
@@ -40,6 +42,24 @@ func (m *mockLogger) Debugf(format string, args ...interface{}) {
 	m.lastFormat = format
 	m.lastArgs = args
 }
+
+func (m *mockLogger) Debug(msg string, fields ...log.Field) {}
+
+func (m *mockLogger) Info(msg string, fields ...log.Field) {}
+
+func (m *mockLogger) Warn(msg string, fields ...log.Field) {}
+
+func (m *mockLogger) Error(msg string, fields ...log.Field) {}
+
+func (m *mockLogger) Fatal(msg string, fields ...log.Field) {}
+
+func (m *mockLogger) Panic(msg string, fields ...log.Field) {}
+
+func (m *mockLogger) With(fields ...log.Field) log.Logger { return m }
+
+func (m *mockLogger) Named(name string) log.Logger { return m }
+
+func (m *mockLogger) Sync() error { return nil }
 
 // TestConnect_ToDSN tests the DSN generation from Connect config.
 func TestConnect_ToDSN(t *testing.T) {

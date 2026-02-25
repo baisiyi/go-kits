@@ -3,14 +3,13 @@ package log
 import (
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/baisiyi/go-kits/log/rollwriter"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
-
-/*具体的实现*/
 
 // Levels is the map from string to zapcore.Level.
 var Levels = map[string]zapcore.Level{
@@ -24,8 +23,65 @@ var Levels = map[string]zapcore.Level{
 }
 
 type ZapLogger struct {
-	levels []zap.AtomicLevel
 	logger *zap.Logger
+}
+
+// WriterFactory creates a zapcore.Core.
+type WriterFactory interface {
+	Setup(name string, dec Decoder) error
+}
+
+// WriterFactoryFunc is an adapter to allow the use of
+// ordinary functions as WriterFactory.
+type WriterFactoryFunc func(name string, dec Decoder) error
+
+// Setup calls fn(name, dec)
+func (fn WriterFactoryFunc) Setup(name string, dec Decoder) error {
+	return fn(name, dec)
+}
+
+var (
+	factoryMu   sync.RWMutex
+	factories  = make(map[string]WriterFactory)
+)
+
+func init() {
+	RegisterWriter(OutputConsole, WriterFactoryFunc(defaultConsoleWriterFactory))
+	RegisterWriter(OutputFile, WriterFactoryFunc(defaultFileWriterFactory))
+}
+
+// RegisterWriter registers a writer factory.
+func RegisterWriter(name string, factory WriterFactory) {
+	factoryMu.Lock()
+	defer factoryMu.Unlock()
+	factories[name] = factory
+}
+
+// GetWriter gets a registered writer factory.
+func GetWriter(name string) WriterFactory {
+	factoryMu.RLock()
+	f := factories[name]
+	factoryMu.RUnlock()
+	return f
+}
+
+// Decoder decode config to OutputConfig.
+type Decoder struct {
+	OutputConfig *OutputConfig
+	Core         zapcore.Core
+	ZapLevel     zap.AtomicLevel
+}
+
+// Decode 作用：配置plugin，解耦plugin的配置实例和参数实例，参数实例只要实现了Decoder接口，即可在Decode方法中，将参数实例赋值给plugin的配置实例
+// 如： FileWriterFactory 中，FileWriterFactory 需要配置OutputConfig，但是传入配置是Decoder
+// (d Decoder) Decode(cfg interface{}) error 是 FileWriterFactory 和 ConsoleWriterFactory 使用的配置工具
+func (d Decoder) Decode(cfg interface{}) error {
+	output, ok := cfg.(**OutputConfig)
+	if !ok {
+		return fmt.Errorf("decoder config type:%T invalid, not **OutputConfig", cfg)
+	}
+	*output = d.OutputConfig
+	return nil
 }
 
 func NewZapLog(c Config) Logger {
@@ -34,24 +90,20 @@ func NewZapLog(c Config) Logger {
 
 // NewZapLogWithCallerSkip creates a trpc default Logger from zap.
 func NewZapLogWithCallerSkip(cfg Config, callerSkip int) Logger {
-	var (
-		cores  []zapcore.Core
-		levels []zap.AtomicLevel
-	)
+	var cores []zapcore.Core
 	for _, c := range cfg {
 		writer := GetWriter(c.Writer)
 		if writer == nil {
 			panic("log: writer core: " + c.Writer + " no registered")
 		}
-		decoder := &Decoder{OutputConfig: &c}
+		var decoder Decoder
+		decoder.OutputConfig = &c
 		if err := writer.Setup(c.Writer, decoder); err != nil {
 			panic("log: writer core: " + c.Writer + " setup fail: " + err.Error())
 		}
 		cores = append(cores, decoder.Core)
-		levels = append(levels, decoder.ZapLevel)
 	}
 	return &ZapLogger{
-		levels: levels,
 		logger: zap.New(
 			zapcore.NewTee(cores...),
 			zap.AddCallerSkip(callerSkip),
@@ -205,26 +257,77 @@ func GetLogEncoderKey(defKey, key string) string {
 	return key
 }
 
-func (z ZapLogger) Infof(format string, args ...interface{}) {
-	if z.logger.Core().Enabled(zapcore.InfoLevel) {
-		z.logger.Info(fmt.Sprintf(format, args...))
-	}
+// 结构化日志方法
+func (z *ZapLogger) Debug(msg string, fields ...Field) {
+	z.logger.Debug(msg, fields...)
 }
 
-func (z ZapLogger) Errorf(format string, args ...interface{}) {
-	if z.logger.Core().Enabled(zapcore.ErrorLevel) {
-		z.logger.Error(fmt.Sprintf(format, args...))
-	}
+func (z *ZapLogger) Info(msg string, fields ...Field) {
+	z.logger.Info(msg, fields...)
 }
 
-func (z ZapLogger) Debugf(format string, args ...interface{}) {
-	if z.logger.Core().Enabled(zapcore.DebugLevel) {
-		z.logger.Debug(fmt.Sprintf(format, args...))
-	}
+func (z *ZapLogger) Warn(msg string, fields ...Field) {
+	z.logger.Warn(msg, fields...)
 }
 
-func (z ZapLogger) Warnf(format string, args ...interface{}) {
-	if z.logger.Core().Enabled(zapcore.WarnLevel) {
-		z.logger.Warn(fmt.Sprintf(format, args...))
+func (z *ZapLogger) Error(msg string, fields ...Field) {
+	z.logger.Error(msg, fields...)
+}
+
+func (z *ZapLogger) Fatal(msg string, fields ...Field) {
+	z.logger.Fatal(msg, fields...)
+}
+
+func (z *ZapLogger) Panic(msg string, fields ...Field) {
+	z.logger.Panic(msg, fields...)
+}
+
+// 格式化日志方法（兼容旧API）- 移除冗余的Enabled检查
+func (z *ZapLogger) Infof(format string, args ...interface{}) {
+	z.logger.Info(fmt.Sprintf(format, args...))
+}
+
+func (z *ZapLogger) Errorf(format string, args ...interface{}) {
+	z.logger.Error(fmt.Sprintf(format, args...))
+}
+
+func (z *ZapLogger) Debugf(format string, args ...interface{}) {
+	z.logger.Debug(fmt.Sprintf(format, args...))
+}
+
+func (z *ZapLogger) Warnf(format string, args ...interface{}) {
+	z.logger.Warn(fmt.Sprintf(format, args...))
+}
+
+// 上下文方法
+func (z *ZapLogger) With(fields ...Field) Logger {
+	return &ZapLogger{logger: z.logger.With(fields...)}
+}
+
+func (z *ZapLogger) Named(name string) Logger {
+	return &ZapLogger{logger: z.logger.Named(name)}
+}
+
+// Sync 实现sync接口
+func (z *ZapLogger) Sync() error {
+	return z.logger.Sync()
+}
+
+// defaultConsoleWriterFactory creates a console writer.
+func defaultConsoleWriterFactory(name string, dec Decoder) error {
+	core, lvl := newConsoleCore(dec.OutputConfig)
+	dec.Core = core
+	dec.ZapLevel = lvl
+	return nil
+}
+
+// defaultFileWriterFactory creates a file writer.
+func defaultFileWriterFactory(name string, dec Decoder) error {
+	core, lvl, err := newFileCore(dec.OutputConfig)
+	if err != nil {
+		return err
 	}
+	dec.Core = core
+	dec.ZapLevel = lvl
+	return nil
 }

@@ -12,6 +12,11 @@ type mockLogger struct {
 	errorfCalled bool
 	warnfCalled  bool
 	debugfCalled bool
+	fatalfCalled bool
+	panicfCalled bool
+	infoCalled   bool
+	lastMsg      string
+	lastFields   []Field
 	lastFormat   string
 	lastArgs     []interface{}
 }
@@ -48,27 +53,58 @@ func (m *mockLogger) Debugf(format string, args ...interface{}) {
 	m.lastArgs = args
 }
 
-// saveAndReplaceDefaultLogger saves the current default logger and replaces it for testing.
-func saveAndReplaceDefaultLogger(t *testing.T, newLogger Logger) (restore func()) {
-	t.Helper()
-	oldLogger := DefaultLogger
-	oldLoggers := loggers
-
-	loggers = make(map[string]Logger)
-	DefaultLogger = newLogger
-	loggers[defaultLoggerName] = newLogger
-
-	return func() {
-		DefaultLogger = oldLogger
-		loggers = oldLoggers
-	}
+func (m *mockLogger) Fatalf(format string, args ...interface{}) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.fatalfCalled = true
+	m.lastFormat = format
+	m.lastArgs = args
 }
+
+func (m *mockLogger) Panicf(format string, args ...interface{}) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.panicfCalled = true
+	m.lastFormat = format
+	m.lastArgs = args
+}
+
+func (m *mockLogger) Debug(msg string, fields ...Field) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.debugfCalled = true
+	m.lastMsg = msg
+	m.lastFields = fields
+}
+
+func (m *mockLogger) Info(msg string, fields ...Field) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.infoCalled = true
+	m.lastMsg = msg
+	m.lastFields = fields
+}
+
+func (m *mockLogger) Warn(msg string, fields ...Field) {}
+
+func (m *mockLogger) Error(msg string, fields ...Field) {}
+
+func (m *mockLogger) Fatal(msg string, fields ...Field) {}
+
+func (m *mockLogger) Panic(msg string, fields ...Field) {}
+
+func (m *mockLogger) With(fields ...Field) Logger { return m }
+
+func (m *mockLogger) Named(name string) Logger { return m }
+
+func (m *mockLogger) Sync() error { return nil }
 
 // TestInfof tests the Infof convenience function.
 func TestInfof(t *testing.T) {
 	mock := &mockLogger{}
-	restore := saveAndReplaceDefaultLogger(t, mock)
-	defer restore()
+	oldLogger := defaultLogger
+	SetDefault(mock)
+	defer SetDefault(oldLogger)
 
 	Infof("test %s", "message")
 	if !mock.infofCalled {
@@ -79,8 +115,9 @@ func TestInfof(t *testing.T) {
 // TestErrorf tests the Errorf convenience function.
 func TestErrorf(t *testing.T) {
 	mock := &mockLogger{}
-	restore := saveAndReplaceDefaultLogger(t, mock)
-	defer restore()
+	oldLogger := defaultLogger
+	SetDefault(mock)
+	defer SetDefault(oldLogger)
 
 	Errorf("error %s", "message")
 	if !mock.errorfCalled {
@@ -91,8 +128,9 @@ func TestErrorf(t *testing.T) {
 // TestWarnf tests the Warnf convenience function.
 func TestWarnf(t *testing.T) {
 	mock := &mockLogger{}
-	restore := saveAndReplaceDefaultLogger(t, mock)
-	defer restore()
+	oldLogger := defaultLogger
+	SetDefault(mock)
+	defer SetDefault(oldLogger)
 
 	Warnf("warn %s", "message")
 	if !mock.warnfCalled {
@@ -103,8 +141,9 @@ func TestWarnf(t *testing.T) {
 // TestDebugf tests the Debugf convenience function.
 func TestDebugf(t *testing.T) {
 	mock := &mockLogger{}
-	restore := saveAndReplaceDefaultLogger(t, mock)
-	defer restore()
+	oldLogger := defaultLogger
+	SetDefault(mock)
+	defer SetDefault(oldLogger)
 
 	Debugf("debug %s", "message")
 	if !mock.debugfCalled {
@@ -112,46 +151,16 @@ func TestDebugf(t *testing.T) {
 	}
 }
 
-// TestRegisterNilPanic tests that registering nil logger panics.
-func TestRegisterNilPanic(t *testing.T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("Expected panic when registering nil logger")
-		}
-	}()
-	// Note: This test may affect other tests because it modifies global state.
-	// We use a unique name to minimize conflicts.
-	Register("nil_test", nil)
-}
-
-// TestRegisterDuplicate tests that duplicate registration (non-default) panics.
-func TestRegisterDuplicate(t *testing.T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("Expected panic when registering duplicate logger")
-		}
-	}()
-
-	mock1 := &mockLogger{}
-	mock2 := &mockLogger{}
-
-	Register("duplicate_test", mock1)
-	Register("duplicate_test", mock2)
-}
-
-// TestGet tests retrieving registered and unregistered loggers.
-func TestGet(t *testing.T) {
+// TestInfo tests the Info convenience function.
+func TestInfo(t *testing.T) {
 	mock := &mockLogger{}
-	Register("test_get", mock)
+	oldLogger := defaultLogger
+	SetDefault(mock)
+	defer SetDefault(oldLogger)
 
-	retrieved := Get("test_get")
-	if retrieved != mock {
-		t.Error("Did not retrieve the registered logger")
-	}
-
-	notFound := Get("not_registered")
-	if notFound != nil {
-		t.Error("Expected nil for unregistered logger")
+	Info("test message", String("key", "value"))
+	if !mock.infoCalled {
+		t.Error("Info was not called on mock logger")
 	}
 }
 
