@@ -146,7 +146,7 @@ func TestConnect_ToDSN_Format(t *testing.T) {
 // TestDBConfig_Fields tests that DBConfig has all required fields.
 func TestDBConfig_Fields(t *testing.T) {
 	cfg := DBConfig{
-		DSN: &Connect{
+		DSN: Connect{
 			Host: "localhost",
 			Port: 3306,
 		},

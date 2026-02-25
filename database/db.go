@@ -13,7 +13,7 @@ import (
 )
 
 type DBConfig struct {
-	DSN             *Connect      `mapstructure:"dsn" json:"dsn" yaml:"dsn"`
+	DSN             Connect       `mapstructure:"dsn" json:"dsn" yaml:"dsn"`
 	MaxOpenConns    int           `mapstructure:"max_open_conns" yaml:"max_open_conns"`
 	MaxIdleConns    int           `mapstructure:"max_idle_conns" yaml:"max_idle_conns"`
 	ConnMaxLifetime time.Duration `mapstructure:"conn_max_lifetime" yaml:"conn_max_lifetime"`
