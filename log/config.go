@@ -20,21 +20,21 @@ type Config []OutputConfig
 
 type OutputConfig struct {
 	// Writer is the output of log, such as console or file.
-	Writer      string      `yaml:"writer"`
-	WriteConfig WriteConfig `yaml:"writer_config"`
+	Writer      string      `yaml:"writer" mapstructure:"writer"`
+	WriteConfig WriteConfig `yaml:"writer_config" mapstructure:"writer_config"`
 
 	// Formatter is the format of log, such as console or json.
-	Formatter    string       `yaml:"formatter"`
-	FormatConfig FormatConfig `yaml:"formatter_config"`
+	Formatter    string       `yaml:"formatter" mapstructure:"formatter"`
+	FormatConfig FormatConfig `yaml:"formatter_config" mapstructure:"formatter_config"`
 
 	// Level controls the log level, like debug, info or error.
-	Level string `yaml:"level"`
+	Level string `yaml:"level" mapstructure:"level"`
 
 	// CallerSkip controls the nesting depth of log function.
-	CallerSkip int `yaml:"caller_skip"`
+	CallerSkip int `yaml:"caller_skip" mapstructure:"caller_skip"`
 
 	// EnableColor determines if the output is colored. The default value is false.
-	EnableColor bool `yaml:"enable_color"`
+	EnableColor bool `yaml:"enable_color" mapstructure:"enable_color"`
 }
 
 // WriteConfig is the local file config.

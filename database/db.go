@@ -23,18 +23,43 @@ type DBConfig struct {
 }
 
 type Connect struct {
-	Host        string `mapstructure:"host"`
-	Port        int    `mapstructure:"port"`
-	Username    string `mapstructure:"username"`
-	Password    string `mapstructure:"password"`
-	Name        string `mapstructure:"name"`
-	TablePrefix string `mapstructure:"table_prefix"`
+	Host         string        `mapstructure:"host"`
+	Port         int           `mapstructure:"port"`
+	Username     string        `mapstructure:"username"`
+	Password     string        `mapstructure:"password"`
+	Name         string        `mapstructure:"name"`
+	TablePrefix  string        `mapstructure:"table_prefix"`
+	Timeout      time.Duration `mapstructure:"timeout" yaml:"timeout"`
+	ReadTimeout  time.Duration `mapstructure:"read_timeout" yaml:"read_timeout"`
+	WriteTimeout time.Duration `mapstructure:"write_timeout" yaml:"write_timeout"`
+	Location     string        `mapstructure:"location"`
+	TLS          bool          `mapstructure:"tls"`
 }
 
 // ToDSN 将 Connect 转换为 MySQL DSN 字符串
 func (c *Connect) ToDSN() string {
-	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4",
 		c.Username, c.Password, c.Host, c.Port, c.Name)
+
+	if c.TLS {
+		dsn = dsn + "&tls=true"
+	}
+	if c.Location != "" {
+		dsn += fmt.Sprintf("&parseTime=True&loc=%s", c.Location)
+	}
+
+	// 添加超时参数
+	if c.Timeout > 0 {
+		dsn += fmt.Sprintf("&timeout=%s", c.Timeout)
+	}
+	if c.ReadTimeout > 0 {
+		dsn += fmt.Sprintf("&readTimeout=%s", c.ReadTimeout)
+	}
+	if c.WriteTimeout > 0 {
+		dsn += fmt.Sprintf("&writeTimeout=%s", c.WriteTimeout)
+	}
+
+	return dsn
 }
 
 // Client 封装了 GORM 实例，不对外直接暴露 *gorm.DB，而是通过 GetDB() 获取

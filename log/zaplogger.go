@@ -28,15 +28,15 @@ type ZapLogger struct {
 
 // WriterFactory creates a zapcore.Core.
 type WriterFactory interface {
-	Setup(name string, dec Decoder) error
+	Setup(name string, dec *Decoder) error
 }
 
 // WriterFactoryFunc is an adapter to allow the use of
 // ordinary functions as WriterFactory.
-type WriterFactoryFunc func(name string, dec Decoder) error
+type WriterFactoryFunc func(name string, dec *Decoder) error
 
 // Setup calls fn(name, dec)
-func (fn WriterFactoryFunc) Setup(name string, dec Decoder) error {
+func (fn WriterFactoryFunc) Setup(name string, dec *Decoder) error {
 	return fn(name, dec)
 }
 
@@ -98,7 +98,7 @@ func NewZapLogWithCallerSkip(cfg Config, callerSkip int) Logger {
 		}
 		var decoder Decoder
 		decoder.OutputConfig = &c
-		if err := writer.Setup(c.Writer, decoder); err != nil {
+		if err := writer.Setup(c.Writer, &decoder); err != nil {
 			panic("log: writer core: " + c.Writer + " setup fail: " + err.Error())
 		}
 		cores = append(cores, decoder.Core)
@@ -314,7 +314,7 @@ func (z *ZapLogger) Sync() error {
 }
 
 // defaultConsoleWriterFactory creates a console writer.
-func defaultConsoleWriterFactory(name string, dec Decoder) error {
+func defaultConsoleWriterFactory(name string, dec *Decoder) error {
 	core, lvl := newConsoleCore(dec.OutputConfig)
 	dec.Core = core
 	dec.ZapLevel = lvl
@@ -322,7 +322,7 @@ func defaultConsoleWriterFactory(name string, dec Decoder) error {
 }
 
 // defaultFileWriterFactory creates a file writer.
-func defaultFileWriterFactory(name string, dec Decoder) error {
+func defaultFileWriterFactory(name string, dec *Decoder) error {
 	core, lvl, err := newFileCore(dec.OutputConfig)
 	if err != nil {
 		return err
